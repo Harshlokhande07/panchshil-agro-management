@@ -1,0 +1,385 @@
+<div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Product Catalog</h4>
+      <div class="text-muted small">Manage agricultural products, category classification, purchase &amp; selling prices</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" id="btnPriceHist">
+        <i class="bi bi-clock-history me-1"></i> Price Audit Logs
+      </button>
+      <button class="btn btn-success btn-sm admin-only" id="btnAdd">
+        <i class="bi bi-plus-circle me-1"></i> Add Product
+      </button>
+    </div>
+  </div>
+
+  <!-- Search & Filter Card -->
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-center">
+        <div class="col-md-5">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+            <input class="form-control border-start-0 ps-0" id="search" placeholder="Search by product name, SKU, category, or supplier...">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select form-select-sm" id="filterCategory">
+            <option value="ALL">All Categories</option>
+            <option value="Fertilizer">Fertilizer</option>
+            <option value="Pesticide">Pesticide</option>
+            <option value="Seed">Seed</option>
+            <option value="Equipment">Equipment</option>
+          </select>
+        </div>
+        <div class="col-md-3 text-end">
+          <span class="small text-muted" id="prodCount">Loading products...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Products Table Card -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0 table-responsive">
+      <table class="table table-hover align-middle mb-0" id="tblProducts">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">ID</th>
+            <th>SKU</th>
+            <th>Product Name</th>
+            <th>Category</th>
+            <th>Primary Supplier</th>
+            <th class="text-end">Purchase Cost</th>
+            <th class="text-end">Sale Price</th>
+            <th class="text-end">Est. Margin</th>
+            <th class="text-center">Min Stock</th>
+            <th class="text-center">Status</th>
+            <th class="text-end pe-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tblBody">
+          <tr><td colspan="11" class="text-center py-4 text-muted">Loading products...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add/Edit Product Modal -->
+  <div class="modal fade" id="mdl" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="mdlTitle">Product Details</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 row g-3">
+          <input type="hidden" id="id">
+          <div class="col-md-8">
+            <label class="form-label small fw-bold">Product Name <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm" id="product_name" placeholder="e.g. Urea 46% N 50kg bag">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Category <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="category">
+              <option value="Fertilizer">Fertilizer</option>
+              <option value="Pesticide">Pesticide</option>
+              <option value="Seed">Seed</option>
+              <option value="Equipment">Equipment</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Supplier</label>
+            <select class="form-select form-select-sm" id="supplier_id"></select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Brand / Manufacturer</label>
+            <input class="form-control form-control-sm" id="brand" placeholder="e.g. IFFCO, Bayer, Syngenta">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Purchase Price (₹) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control form-control-sm" id="purchase_price" placeholder="0.00">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Selling Price (₹) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control form-control-sm" id="selling_price" placeholder="0.00">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Reorder Level (Min Stock)</label>
+            <input type="number" class="form-control form-control-sm" id="min_stock" value="10">
+          </div>
+          <div class="col-12" id="priceWarn"></div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-sm btn-success px-3" id="btnSave">Save Product</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Price History Modal -->
+  <div class="modal fade" id="mdlHist" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-graph-up text-primary me-2"></i>Product Price Change Audit
+          </h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-0 table-responsive" style="max-height: 480px;">
+          <table class="table table-hover align-middle mb-0" id="tblHist">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th class="ps-3">Audit ID</th>
+                <th>Product Name</th>
+                <th class="text-end">Old Price</th>
+                <th class="text-end">New Price</th>
+                <th class="text-end">Change</th>
+                <th class="pe-3 text-end">Changed Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="tblHistBody">
+              <tr><td colspan="6" class="text-center py-3 text-muted">No audit logs available</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer bg-light py-2">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModuleProducts = {
+  user: null, rows: [], suppliers: [], modal: null, modalHist: null,
+  init(user) {
+    this.user = user;
+    const mdlEl = document.getElementById('mdl');
+    if (mdlEl) this.modal = new bootstrap.Modal(mdlEl);
+    const mdlHistEl = document.getElementById('mdlHist');
+    if (mdlHistEl) this.modalHist = new bootstrap.Modal(mdlHistEl);
+
+    if (user && user.role !== 'admin') {
+      const btnAdd = document.getElementById('btnAdd');
+      if (btnAdd) btnAdd.style.display = 'none';
+    }
+    const btnAdd = document.getElementById('btnAdd');
+    if (btnAdd) btnAdd.onclick = () => this.open();
+    const btnSave = document.getElementById('btnSave');
+    if (btnSave) btnSave.onclick = () => this.save();
+    const btnHist = document.getElementById('btnPriceHist');
+    if (btnHist) btnHist.onclick = () => this.showHist();
+
+    const searchInput = document.getElementById('search');
+    if (searchInput) searchInput.oninput = () => this.render();
+    const catSelect = document.getElementById('filterCategory');
+    if (catSelect) catSelect.onchange = () => this.render();
+
+    const ppInput = document.getElementById('purchase_price');
+    if (ppInput) ppInput.oninput = () => this.checkPrice();
+    const spInput = document.getElementById('selling_price');
+    if (spInput) spInput.oninput = () => this.checkPrice();
+
+    this.load();
+  },
+  async load() {
+    try {
+      const [pr, sr] = await Promise.all([fetch('/api/products'), fetch('/api/suppliers')]);
+      const p = await pr.json();
+      const s = await sr.json();
+      this.rows = (p.rows || []).sort((a,b) => a.product_id - b.product_id);
+      this.suppliers = s.rows || [];
+
+      const sel = document.getElementById('supplier_id');
+      if (sel) {
+        sel.innerHTML = this.suppliers.map(x => `<option value="${x.supplier_id}">${x.name} (${x.city || 'Nashik'})</option>`).join('');
+      }
+      this.render();
+    } catch (e) {
+      if (window.showToast) showToast('Failed to load products: ' + e.message, 'error');
+    }
+  },
+  checkPrice() {
+    const pp = Number(document.getElementById('purchase_price').value || 0);
+    const sp = Number(document.getElementById('selling_price').value || 0);
+    const w = document.getElementById('priceWarn');
+    if (sp > 0 && sp < pp) {
+      w.innerHTML = '<div class="alert alert-warning py-1 px-2 small mb-0"><i class="bi bi-exclamation-triangle me-1"></i> Warning: Selling price is less than purchase cost (Negative Margin).</div>';
+    } else {
+      w.innerHTML = '';
+    }
+  },
+  render() {
+    const qv = (document.getElementById('search')?.value || '').toLowerCase().trim();
+    const catVal = document.getElementById('filterCategory')?.value || 'ALL';
+
+    const list = this.rows.filter(r => {
+      const matchSearch = !qv || JSON.stringify(r).toLowerCase().includes(qv);
+      const matchCat = catVal === 'ALL' || (r.category && r.category.toLowerCase() === catVal.toLowerCase());
+      return matchSearch && matchCat;
+    });
+
+    const countEl = document.getElementById('prodCount');
+    if (countEl) countEl.textContent = `Showing ${list.length} of ${this.rows.length} products`;
+
+    const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const tbody = document.getElementById('tblBody');
+    if (!tbody) return;
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-muted">No matching products found.</td></tr>';
+      return;
+    }
+
+    let html = '';
+    for (const r of list) {
+      const pp = Number(r.purchase_price || 0);
+      const sp = Number(r.selling_price || 0);
+      const margin = sp > 0 ? (((sp - pp) / sp) * 100).toFixed(1) : 0;
+      const marginColor = margin >= 20 ? 'text-success' : (margin >= 10 ? 'text-primary' : 'text-danger');
+
+      let catBadge = 'bg-light text-dark border';
+      if (r.category === 'Fertilizer') catBadge = 'bg-success-subtle text-success border border-success-subtle';
+      else if (r.category === 'Pesticide') catBadge = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+      else if (r.category === 'Seed') catBadge = 'bg-info-subtle text-info border border-info-subtle';
+      else if (r.category === 'Equipment') catBadge = 'bg-primary-subtle text-primary border border-primary-subtle';
+
+      html += `<tr>
+        <td class="ps-3 fw-bold text-muted">#${r.product_id}</td>
+        <td><code>${r.sku || '-'}</code></td>
+        <td class="fw-semibold text-dark">${r.product_name}</td>
+        <td><span class="badge ${catBadge}">${r.category || 'General'}</span></td>
+        <td class="text-secondary small">${r.supplier_name || 'Direct'}</td>
+        <td class="text-end text-muted">${formatCurr(pp)}</td>
+        <td class="text-end fw-bold text-dark">${formatCurr(sp)}</td>
+        <td class="text-end ${marginColor} fw-bold small">${margin}%</td>
+        <td class="text-center"><span class="badge bg-light text-secondary border">${r.min_stock || 10} ${r.unit || 'units'}</span></td>
+        <td class="text-center"><span class="badge ${r.is_active !== false ? 'bg-success' : 'bg-secondary'} rounded-pill small">${r.is_active !== false ? 'Active' : 'Inactive'}</span></td>
+        <td class="text-end pe-3">
+          ${this.user && this.user.role === 'admin' ? `
+            <button class="btn btn-xs btn-outline-primary me-1" onclick="ModuleProducts.edit(${r.product_id})" title="Edit Product">
+              <i class="bi bi-pencil"></i> Edit
+            </button>
+            <button class="btn btn-xs btn-outline-danger" onclick="ModuleProducts.del(${r.product_id})" title="Delete Product">
+              <i class="bi bi-trash"></i>
+            </button>
+          ` : '<span class="text-muted small">View Only</span>'}
+        </td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  open(r = {}) {
+    document.getElementById('mdlTitle').textContent = r.product_id ? 'Edit Product #' + r.product_id : 'Add New Product';
+    document.getElementById('id').value = r.product_id || '';
+    document.getElementById('supplier_id').value = r.supplier_id || (this.suppliers[0]?.supplier_id || 1);
+    document.getElementById('product_name').value = r.product_name || '';
+    document.getElementById('category').value = r.category || 'Fertilizer';
+    document.getElementById('brand').value = r.brand || '';
+    document.getElementById('purchase_price').value = r.purchase_price !== undefined ? r.purchase_price : '';
+    document.getElementById('selling_price').value = r.selling_price !== undefined ? r.selling_price : '';
+    document.getElementById('min_stock').value = r.min_stock || 10;
+    document.getElementById('priceWarn').innerHTML = '';
+    this.modal.show();
+  },
+  edit(id) {
+    const r = this.rows.find(x => x.product_id == id);
+    if (r) this.open(r);
+  },
+  async save() {
+    if (this.user && this.user.role !== 'admin') return showToast('Permission denied: Only admin can modify catalog', 'error');
+    const id = document.getElementById('id').value;
+    const name = document.getElementById('product_name').value.trim();
+    if (!name) return showToast('Product name is required', 'error');
+    const pp = Number(document.getElementById('purchase_price').value);
+    const sp = Number(document.getElementById('selling_price').value);
+    if (isNaN(pp) || pp < 0 || isNaN(sp) || sp < 0) return showToast('Valid non-negative prices are required', 'error');
+
+    const body = {
+      supplier_id: document.getElementById('supplier_id').value,
+      product_name: name,
+      category: document.getElementById('category').value,
+      brand: document.getElementById('brand').value,
+      purchase_price: pp,
+      selling_price: sp,
+      min_stock: document.getElementById('min_stock').value || 10
+    };
+
+    try {
+      if (id) {
+        const res = await fetch('/api/products/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showToast('Product updated successfully');
+      } else {
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showToast('Product added successfully');
+      }
+      this.modal.hide();
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  },
+  async del(id) {
+    if (!confirm(`Are you sure you want to delete product #${id}?`)) return;
+    try {
+      const res = await fetch('/api/products/' + id, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast('Product deleted');
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  },
+  async showHist() {
+    try {
+      const res = await fetch('/api/products/price-audit');
+      const data = await res.json();
+      const rows = data.rows || [];
+      const tbody = document.getElementById('tblHistBody');
+      const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-muted">No price change logs found.</td></tr>';
+      } else {
+        let html = '';
+        for (const r of rows) {
+          const diff = Number(r.new_price) - Number(r.old_price);
+          const diffBadge = diff >= 0 ? `<span class="text-success">+${formatCurr(diff)}</span>` : `<span class="text-danger">${formatCurr(diff)}</span>`;
+          const dt = r.changed_on ? new Date(r.changed_on).toLocaleString() : '-';
+          html += `<tr>
+            <td class="ps-3 fw-bold text-muted">#${r.audit_id}</td>
+            <td class="fw-semibold">${r.product_name || 'Product #' + r.product_id}</td>
+            <td class="text-end text-muted">${formatCurr(r.old_price)}</td>
+            <td class="text-end fw-bold text-dark">${formatCurr(r.new_price)}</td>
+            <td class="text-end">${diffBadge}</td>
+            <td class="pe-3 text-end text-secondary small">${dt}</td>
+          </tr>`;
+        }
+        tbody.innerHTML = html;
+      }
+      this.modalHist.show();
+    } catch(e) {
+      showToast('Failed to load price history: ' + e.message, 'error');
+    }
+  }
+};
+</script>

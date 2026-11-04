@@ -1,0 +1,274 @@
+<div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Warranty &amp; Replacement Claims</h4>
+      <div class="text-muted small">Process farmer product defect claims, manufacturer returns, and replacements</div>
+    </div>
+    <button class="btn btn-success btn-sm" id="btnAdd">
+      <i class="bi bi-shield-plus me-1"></i> File Warranty Claim
+    </button>
+  </div>
+
+  <div class="row g-3">
+    <!-- Main Claims Table -->
+    <div class="col-lg-8">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary">
+            <i class="bi bi-shield-check text-success me-2"></i>Active Warranty Claims
+          </span>
+          <span class="badge bg-light text-secondary border">Claims Log</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblWarranty">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">ID</th>
+                <th>Product &amp; Batch</th>
+                <th>Customer</th>
+                <th>Claim Date</th>
+                <th>Issue Description</th>
+                <th class="text-center">Claim Status</th>
+                <th class="text-end pe-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody">
+              <tr><td colspan="7" class="text-center py-4 text-muted">Loading warranty claims...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Breakdown Sidebar -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white py-3 border-bottom">
+          <span class="fw-bold text-secondary">
+            <i class="bi bi-pie-chart text-success me-2"></i>Claims by Supplier Status
+          </span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblStatus">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Status</th>
+                <th class="pe-3 text-end">Claims Count</th>
+              </tr>
+            </thead>
+            <tbody id="tblStatusBody">
+              <tr><td colspan="2" class="text-center py-3 text-muted">Loading summary...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 bg-light p-3">
+        <div class="small fw-bold text-dark mb-1"><i class="bi bi-info-circle me-1 text-primary"></i>Warranty Policy Note</div>
+        <div class="text-secondary small">
+          Agro products are covered under manufacturer guarantee against manufacturing defects. Use the quick status actions to update supplier processing stage.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Warranty Claim Modal -->
+  <div class="modal fade" id="mdl" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold">File Warranty Claim</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 row g-3">
+          <div class="col-12">
+            <label class="form-label small fw-bold">Customer <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="customer_id"></select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-bold">Product <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="product_id"></select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-bold">Issue / Defect Description <span class="text-danger">*</span></label>
+            <textarea class="form-control form-control-sm" id="return_reason" rows="3" placeholder="Describe the fault, defect, or damage..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer bg-light py-2">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-sm btn-success px-3" id="btnSave">Submit Claim</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModuleWarranty = {
+  user: null, rows: [], products: [], customers: [], modal: null,
+  init(user) {
+    this.user = user;
+    const mdlEl = document.getElementById('mdl');
+    if (mdlEl) this.modal = new bootstrap.Modal(mdlEl);
+
+    const btnAdd = document.getElementById('btnAdd');
+    if (btnAdd) btnAdd.onclick = () => this.open();
+    const btnSave = document.getElementById('btnSave');
+    if (btnSave) btnSave.onclick = () => this.save();
+
+    this.load();
+  },
+  async load() {
+    try {
+      const [wr, pr, cs, st] = await Promise.all([
+        fetch('/api/warranty'),
+        fetch('/api/products'),
+        fetch('/api/customers'),
+        fetch('/api/warranty/by-status')
+      ]);
+
+      const w = await wr.json();
+      const p = await pr.json();
+      const c = await cs.json();
+      const s = await st.json();
+
+      this.rows = w.rows || [];
+      this.products = p.rows || [];
+      this.customers = c.rows || [];
+
+      const sp = document.getElementById('product_id');
+      if (sp) sp.innerHTML = this.products.map(x => `<option value="${x.product_id}">#${x.product_id} - ${x.product_name}</option>`).join('');
+      const sc = document.getElementById('customer_id');
+      if (sc) sc.innerHTML = this.customers.map(x => `<option value="${x.customer_id}">${x.name} (${x.phone || 'No Phone'})</option>`).join('');
+
+      this.render();
+      this.renderStatus(s.rows || []);
+    } catch(e) {
+      if (window.showToast) showToast('Failed to load warranty claims: ' + e.message, 'error');
+    }
+  },
+  render() {
+    const tbody = document.getElementById('tblBody');
+    if (!tbody) return;
+
+    if (!this.rows || this.rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No warranty claims recorded.</td></tr>';
+      return;
+    }
+
+    let html = '';
+    for (const r of this.rows) {
+      let stBadge = 'bg-secondary';
+      const st = r.supplier_status || 'Sent';
+      if (st === 'Sent') stBadge = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+      else if (st === 'Replaced') stBadge = 'bg-success-subtle text-success border border-success-subtle';
+      else if (st === 'Rejected') stBadge = 'bg-danger-subtle text-danger border border-danger-subtle';
+
+      html += `<tr>
+        <td class="ps-3 fw-bold text-muted">#${r.warranty_id}</td>
+        <td>
+          <div class="fw-semibold text-dark">${r.product_name}</div>
+          <div class="text-muted small">Batch: <code>${r.batch_no || 'N/A'}</code></div>
+        </td>
+        <td>
+          <div class="fw-semibold text-dark">${r.customer_name}</div>
+        </td>
+        <td class="small text-secondary">${r.start_date || '-'}</td>
+        <td class="small text-dark" style="max-width: 220px;">${r.return_reason || '-'}</td>
+        <td class="text-center"><span class="badge ${stBadge}">${st}</span></td>
+        <td class="text-end pe-3">
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-xs btn-outline-warning" onclick="ModuleWarranty.updateStatus(${r.warranty_id},'Sent')" title="Mark Sent to Vendor">Sent</button>
+            <button class="btn btn-xs btn-outline-success" onclick="ModuleWarranty.updateStatus(${r.warranty_id},'Replaced')" title="Mark Replaced">Replaced</button>
+            <button class="btn btn-xs btn-outline-danger" onclick="ModuleWarranty.updateStatus(${r.warranty_id},'Rejected')" title="Mark Rejected">Reject</button>
+          </div>
+          ${this.user && this.user.role === 'admin' ? `
+            <button class="btn btn-xs btn-link text-danger ms-1 p-0" onclick="ModuleWarranty.del(${r.warranty_id})" title="Delete Claim">
+              <i class="bi bi-trash"></i>
+            </button>
+          ` : ''}
+        </td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  renderStatus(rows) {
+    const tbody = document.getElementById('tblStatusBody');
+    if (!tbody) return;
+
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-muted">No data available</td></tr>';
+      return;
+    }
+
+    let html = '';
+    for (const r of rows) {
+      let stBadge = 'bg-secondary';
+      if (r.supplier_status === 'Sent') stBadge = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+      else if (r.supplier_status === 'Replaced') stBadge = 'bg-success-subtle text-success border border-success-subtle';
+      else if (r.supplier_status === 'Rejected') stBadge = 'bg-danger-subtle text-danger border border-danger-subtle';
+
+      html += `<tr>
+        <td class="ps-3"><span class="badge ${stBadge}">${r.supplier_status}</span></td>
+        <td class="pe-3 text-end fw-bold text-dark">${r.count}</td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  open() {
+    document.getElementById('return_reason').value = '';
+    this.modal.show();
+  },
+  async save() {
+    const pid = document.getElementById('product_id').value;
+    const cid = document.getElementById('customer_id').value;
+    const reason = document.getElementById('return_reason').value.trim();
+
+    if (!pid || !cid) return showToast('Please select product and customer', 'error');
+    if (!reason) return showToast('Please enter defect description', 'error');
+
+    const body = { product_id: pid, customer_id: cid, return_reason: reason };
+    try {
+      const res = await fetch('/api/warranty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      this.modal.hide();
+      showToast('Warranty claim registered successfully');
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  },
+  async updateStatus(id, st) {
+    try {
+      const res = await fetch('/api/warranty/' + id + '/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplier_status: st })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast('Claim status updated to ' + st);
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  },
+  async del(id) {
+    if (!confirm('Are you sure you want to delete this claim?')) return;
+    try {
+      const res = await fetch('/api/warranty/' + id, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast('Claim record deleted');
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  }
+};
+</script>

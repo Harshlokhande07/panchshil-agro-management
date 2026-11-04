@@ -1,0 +1,22 @@
+{
+  "name": "panchshil-agro-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Panchshil Agro Agencies - Agro Shop Inventory & Credit Management System (DBMS Lab Practical 5)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed:users": "node db/seedAppUsers.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "mysql2": "^3.24.6"
+  }
+}

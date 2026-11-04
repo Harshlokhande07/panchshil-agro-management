@@ -1,0 +1,331 @@
+<div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Executive Dashboard</h4>
+      <div class="text-muted small">Real-time business performance metrics &amp; financial aggregates</div>
+    </div>
+    <button class="btn btn-sm btn-outline-success" onclick="ModuleDashboard.init(window.currentUser)">
+      <i class="bi bi-arrow-clockwise me-1"></i> Refresh Data
+    </button>
+  </div>
+
+  <!-- Key Metric Summary Cards -->
+  <div class="row g-3 mb-4" id="summaryCards">
+    <div class="col-12 text-center text-muted py-3">Loading dashboard metrics...</div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Category Distribution -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary"><i class="bi bi-tags text-success me-2"></i>Product Portfolio by Category</span>
+          <span class="badge bg-light text-secondary border">Grouped Aggregate</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblCategory"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payments by Mode -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary"><i class="bi bi-wallet2 text-success me-2"></i>Collections by Payment Mode</span>
+          <span class="badge bg-light text-secondary border">Payment Modes</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblMode"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suppliers Overview -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary"><i class="bi bi-truck text-success me-2"></i>Products Supplied by Supplier</span>
+          <span class="badge bg-light text-secondary border">Vendor Distribution</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblSupplier"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Credit Status Breakdown -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary"><i class="bi bi-cash-stack text-success me-2"></i>Credit Accounts by Status</span>
+          <span class="badge bg-light text-secondary border">Risk Exposure</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblCreditStatus"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Outstanding Customers -->
+    <div class="col-lg-12">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Customers with Outstanding Balance</span>
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Active Credit</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblOutstanding"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Monthly Payment Collection Chart -->
+    <div class="col-lg-12">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary"><i class="bi bi-graph-up-arrow text-success me-2"></i>Monthly Revenue Collection Trend</span>
+          <span class="badge bg-light text-muted border">Past 12 Months</span>
+        </div>
+        <div class="card-body">
+          <canvas id="chartMonthly" height="75"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModuleDashboard = {
+  chart: null,
+  async init(user) {
+    try {
+      await this.loadSummary();
+      await this.loadAll();
+    } catch(e) {
+      if(window.showToast) showToast('Dashboard load failed: ' + e.message, 'error');
+    }
+  },
+  async loadSummary() {
+    try {
+      const res = await fetch('/api/dashboard/summary');
+      const data = await res.json();
+      const s = data.summary || {};
+      const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      
+      const html = `
+        <div class="col-md-4 col-xl-2 col-6">
+          <div class="card shadow-sm border-0 bg-white">
+            <div class="card-body p-3">
+              <div class="text-muted small fw-bold text-uppercase">Total Products</div>
+              <div class="h4 text-success fw-bold mb-0 mt-1">${(s.total_products || 0).toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 col-xl-2 col-6">
+          <div class="card shadow-sm border-0 bg-white">
+            <div class="card-body p-3">
+              <div class="text-muted small fw-bold text-uppercase">Total Customers</div>
+              <div class="h4 text-primary fw-bold mb-0 mt-1">${(s.total_customers || 0).toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 col-xl-3 col-6">
+          <div class="card shadow-sm border-0 bg-white">
+            <div class="card-body p-3">
+              <div class="text-muted small fw-bold text-uppercase">Total Payments Received</div>
+              <div class="h4 text-dark fw-bold mb-0 mt-1">${formatCurr(s.total_payments_received)}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-3 col-6">
+          <div class="card shadow-sm border-0 bg-white">
+            <div class="card-body p-3">
+              <div class="text-muted small fw-bold text-uppercase">Credit Outstanding</div>
+              <div class="h4 text-danger fw-bold mb-0 mt-1">${formatCurr(s.total_credit_outstanding)}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6 col-xl-2 col-12">
+          <div class="card shadow-sm border-0 bg-white">
+            <div class="card-body p-3">
+              <div class="text-muted small fw-bold text-uppercase">Avg Sale Price</div>
+              <div class="h4 text-secondary fw-bold mb-0 mt-1">${formatCurr(s.avg_selling_price)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      const sc = document.getElementById('summaryCards');
+      if(sc) sc.innerHTML = html;
+    } catch(e) {
+      const sc = document.getElementById('summaryCards');
+      if(sc) sc.innerHTML = '<div class="col-12 text-danger small">Failed to load summary statistics.</div>';
+    }
+  },
+  async loadAll() {
+    const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // 1. Category table
+    try {
+      const res = await fetch('/api/dashboard/by-category');
+      const data = await res.json();
+      this.renderTable(
+        'tblCategory',
+        ['Category', 'Products Count', 'Avg Selling Price', 'Avg Profit Margin'],
+        data.rows,
+        r => [
+          `<span class="badge bg-light text-dark border px-2 py-1">${r.category || '-'}</span>`,
+          `<span class="fw-bold">${r.count || 0}</span>`,
+          `<span class="text-dark">${formatCurr(r.avg_selling)}</span>`,
+          `<span class="text-success fw-bold">${formatCurr(r.avg_profit)}</span>`
+        ]
+      );
+    } catch(e) { console.error(e); }
+
+    // 2. Payment Mode table
+    try {
+      const res = await fetch('/api/dashboard/by-mode');
+      const data = await res.json();
+      this.renderTable(
+        'tblMode',
+        ['Payment Mode', 'Transactions Count', 'Total Collection'],
+        data.rows,
+        r => {
+          let badgeClass = 'bg-secondary';
+          if(r.mode === 'UPI') badgeClass = 'bg-info text-dark';
+          else if(r.mode === 'CASH') badgeClass = 'bg-success';
+          else if(r.mode === 'CARD') badgeClass = 'bg-primary';
+          return [
+            `<span class="badge ${badgeClass}">${r.mode || '-'}</span>`,
+            `<span class="fw-bold">${r.count || 0}</span>`,
+            `<span class="fw-bold text-success">${formatCurr(r.total)}</span>`
+          ];
+        }
+      );
+    } catch(e) { console.error(e); }
+
+    // 3. Supplier distribution table
+    try {
+      const res = await fetch('/api/dashboard/by-supplier');
+      const data = await res.json();
+      this.renderTable(
+        'tblSupplier',
+        ['Supplier Name', 'Products Cataloged', 'Avg Quoted Price'],
+        data.rows,
+        r => [
+          `<span class="fw-semibold text-dark">${r.supplier || '-'}</span>`,
+          `<span class="badge bg-light text-secondary border">${r.product_count || 0} items</span>`,
+          `<span class="text-muted">${formatCurr(r.avg_price)}</span>`
+        ]
+      );
+    } catch(e) { console.error(e); }
+
+    // 4. Credit Status table
+    try {
+      const res = await fetch('/api/dashboard/credit-status');
+      const data = await res.json();
+      this.renderTable(
+        'tblCreditStatus',
+        ['Account Status', 'Active Accounts', 'Total Outstanding Amount'],
+        data.rows,
+        r => {
+          let badge = 'bg-secondary';
+          if(r.status === 'Paid') badge = 'bg-success-subtle text-success border border-success-subtle';
+          else if(r.status === 'Partial') badge = 'bg-info-subtle text-info border border-info-subtle';
+          else if(r.status === 'Overdue') badge = 'bg-danger-subtle text-danger border border-danger-subtle';
+          else if(r.status === 'Pending') badge = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+          return [
+            `<span class="badge ${badge}">${r.status}</span>`,
+            `<span class="fw-bold">${r.count || 0}</span>`,
+            `<span class="fw-bold ${r.status==='Overdue'?'text-danger':'text-dark'}">${formatCurr(r.outstanding)}</span>`
+          ];
+        }
+      );
+    } catch(e) { console.error(e); }
+
+    // 5. Outstanding Customers table
+    try {
+      const res = await fetch('/api/dashboard/outstanding-customers');
+      const data = await res.json();
+      this.renderTable(
+        'tblOutstanding',
+        ['Customer ID', 'Customer Name', 'Phone Number', 'Outstanding Dues'],
+        data.rows,
+        r => [
+          `<span class="badge bg-light text-muted border">#${r.customer_id}</span>`,
+          `<span class="fw-bold text-dark">${r.name || '-'}</span>`,
+          `<span class="text-secondary">${r.phone || '-'}</span>`,
+          `<span class="fw-bold text-danger">${formatCurr(r.outstanding)}</span>`
+        ]
+      );
+    } catch(e) { console.error(e); }
+
+    // 6. Monthly Collections Chart
+    try {
+      const res = await fetch('/api/dashboard/monthly-payments');
+      const data = await res.json();
+      this.drawChart(data.rows || []);
+    } catch(e) { console.error(e); }
+  },
+  renderTable(id, headers, rows, map) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!rows || rows.length === 0) {
+      el.innerHTML = '<tbody><tr><td class="text-center py-3 text-muted">No records available</td></tr></tbody>';
+      return;
+    }
+    let html = '<thead class="table-light"><tr>' + headers.map(h => `<th class="py-2 text-secondary small fw-bold">${h}</th>`).join('') + '</tr></thead><tbody>';
+    for (const r of rows) {
+      html += '<tr>' + map(r).map(v => `<td class="py-2">${v}</td>`).join('') + '</tr>';
+    }
+    html += '</tbody>';
+    el.innerHTML = html;
+  },
+  drawChart(rows) {
+    if (typeof Chart === 'undefined') return;
+    const ctx = document.getElementById('chartMonthly');
+    if (!ctx) return;
+    if (this.chart) this.chart.destroy();
+    
+    // Sort chronological
+    const sorted = [...rows].sort((a,b) => (a.ym > b.ym ? 1 : -1));
+
+    this.chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: sorted.map(r => r.ym),
+        datasets: [{
+          label: 'Collection Amount (₹)',
+          data: sorted.map(r => Number(r.total || 0)),
+          backgroundColor: '#1f7c3f',
+          hoverBackgroundColor: '#166534',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return 'Collection: ₹' + Number(context.raw).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return '₹' + Number(value).toLocaleString('en-IN');
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+};
+</script>

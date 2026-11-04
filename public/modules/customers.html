@@ -1,0 +1,422 @@
+<div>
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0">Customer Management</h4>
+      <div class="text-muted small">Entities &amp; Attributes Table with Auto-Generated Codes and Date Filter</div>
+    </div>
+    <button class="btn btn-success btn-sm px-3" id="btnAdd">
+      <i class="bi bi-person-plus me-1"></i> Add New Customer
+    </button>
+  </div>
+
+  <!-- Filter Card (Date Filter, Type Filter, Search) -->
+  <div class="card mb-3 shadow-sm border-0">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-end">
+        <!-- Date Filter: From Date -->
+        <div class="col-md-2 col-sm-6">
+          <label class="form-label small mb-1 fw-bold text-secondary">
+            <i class="bi bi-calendar-event me-1"></i>From Date
+          </label>
+          <input type="date" class="form-control form-control-sm" id="filterFromDate">
+        </div>
+
+        <!-- Date Filter: To Date -->
+        <div class="col-md-2 col-sm-6">
+          <label class="form-label small mb-1 fw-bold text-secondary">
+            <i class="bi bi-calendar-check me-1"></i>To Date
+          </label>
+          <input type="date" class="form-control form-control-sm" id="filterToDate">
+        </div>
+
+        <!-- Customer Type Filter -->
+        <div class="col-md-2 col-sm-6">
+          <label class="form-label small mb-1 fw-bold text-secondary">
+            <i class="bi bi-tag me-1"></i>Customer Type
+          </label>
+          <select class="form-select form-select-sm" id="filterType">
+            <option value="ALL">All Types</option>
+            <option value="FARMER">Farmer</option>
+            <option value="RETAILER">Retailer</option>
+            <option value="WHOLESALER">Wholesaler</option>
+          </select>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="col-md-3 col-sm-6">
+          <label class="form-label small mb-1 fw-bold text-secondary">
+            <i class="bi bi-search me-1"></i>Search Keyword
+          </label>
+          <input type="text" class="form-control form-control-sm" id="filterSearch" placeholder="Name, code, phone, email, city...">
+        </div>
+
+        <!-- Filter Actions -->
+        <div class="col-md-3 col-sm-12 d-flex gap-2">
+          <button class="btn btn-sm btn-success flex-fill" id="btnApplyFilter">
+            <i class="bi bi-funnel me-1"></i> Apply Filter
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" id="btnResetFilter" title="Reset All Filters">
+            <i class="bi bi-arrow-counterclockwise"></i> Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Date Filter Badges -->
+      <div class="mt-2 pt-2 border-top d-flex gap-2 align-items-center">
+        <span class="small text-muted me-1">Quick Range:</span>
+        <button class="btn btn-xs btn-outline-success py-0 px-2 rounded-pill small" onclick="ModuleCustomers.setQuickRange('today')">Today</button>
+        <button class="btn btn-xs btn-outline-success py-0 px-2 rounded-pill small" onclick="ModuleCustomers.setQuickRange('month')">This Month</button>
+        <button class="btn btn-xs btn-outline-success py-0 px-2 rounded-pill small" onclick="ModuleCustomers.setQuickRange('year')">This Year</button>
+        <button class="btn btn-xs btn-outline-success py-0 px-2 rounded-pill small" onclick="ModuleCustomers.setQuickRange('all')">All Time</button>
+        <span class="ms-auto small text-muted" id="recordsCount">Loading...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entities & Attributes Table Card -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0 table-responsive">
+      <table class="table table-hover align-middle mb-0" id="tblCustomers">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">ID</th>
+            <th>Code</th>
+            <th>Customer Name</th>
+            <th>Type</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>City / Address</th>
+            <th>Registered Date</th>
+            <th>Status</th>
+            <th class="text-end pe-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tblBody">
+          <tr><td colspan="10" class="text-center py-4 text-muted">Loading customer records...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add / Edit Customer Modal -->
+  <div class="modal fade" id="mdlCustomer" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="mdlTitle"><i class="bi bi-person-fill me-2"></i>Customer</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <!-- Auto-Generated ID Alert Box -->
+          <div class="alert alert-success d-flex align-items-center mb-3 py-2" id="autoIdNotice">
+            <i class="bi bi-shield-check fs-4 me-2"></i>
+            <div>
+              <strong>Auto-Generated Customer Identity:</strong>
+              <span id="autoIdText">Loading code...</span>
+            </div>
+          </div>
+
+          <form id="frmCustomer">
+            <input type="hidden" id="cust_id">
+
+            <div class="row g-3">
+              <!-- Name Fields -->
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">First Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="cust_first_name" required placeholder="e.g. Ramesh">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Last Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="cust_last_name" required placeholder="e.g. Patil">
+              </div>
+
+              <!-- Customer Type & Status -->
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Customer Type <span class="text-danger">*</span></label>
+                <select class="form-select" id="cust_type" required>
+                  <option value="FARMER">FARMER (Credit limit: ₹20,000 / 30 days)</option>
+                  <option value="RETAILER">RETAILER (Credit limit: ₹40,000 / 30 days)</option>
+                  <option value="WHOLESALER">WHOLESALER (Credit limit: ₹1,00,000 / 45 days)</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Account Status</label>
+                <select class="form-select" id="cust_status">
+                  <option value="1">Active (Active for Orders &amp; Credit)</option>
+                  <option value="0">Inactive / Suspended</option>
+                </select>
+              </div>
+
+              <!-- Contact Fields -->
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Phone Number</label>
+                <input type="text" class="form-control" id="cust_phone" placeholder="e.g. 9876543210 (Leave blank to auto-generate)">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small fw-bold">Email Address</label>
+                <input type="email" class="form-control" id="cust_email" placeholder="e.g. farmer@example.com (Leave blank to auto-generate)">
+              </div>
+
+              <!-- Address Attributes -->
+              <div class="col-12">
+                <div class="fw-bold small text-secondary border-bottom pb-1 mb-2">Address Attributes</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">Street Address Line</label>
+                <input type="text" class="form-control" id="cust_address" placeholder="e.g. Gat No. 42, Market Yard">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">City</label>
+                <input type="text" class="form-control" id="cust_city" value="Nashik">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Pincode</label>
+                <input type="text" class="form-control" id="cust_pincode" value="422001">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success px-4" id="btnSaveCustomer">
+            <i class="bi bi-check2-circle me-1"></i> Save Customer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModuleCustomers = {
+  user: null,
+  rows: [],
+  modal: null,
+
+  init(user) {
+    this.user = user;
+    const modalEl = document.getElementById('mdlCustomer');
+    if (modalEl) this.modal = new bootstrap.Modal(modalEl);
+
+    document.getElementById('btnAdd').onclick = () => this.openAddModal();
+    document.getElementById('btnSaveCustomer').onclick = () => this.save();
+    document.getElementById('btnApplyFilter').onclick = () => this.load();
+    document.getElementById('btnResetFilter').onclick = () => this.resetFilters();
+
+    // Search on enter key or debounce
+    document.getElementById('filterSearch').onkeydown = (e) => {
+      if (e.key === 'Enter') this.load();
+    };
+
+    this.load();
+  },
+
+  setQuickRange(range) {
+    const fromInput = document.getElementById('filterFromDate');
+    const toInput = document.getElementById('filterToDate');
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+    if (range === 'today') {
+      fromInput.value = todayStr;
+      toInput.value = todayStr;
+    } else if (range === 'month') {
+      fromInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+      toInput.value = todayStr;
+    } else if (range === 'year') {
+      fromInput.value = `${now.getFullYear()}-01-01`;
+      toInput.value = todayStr;
+    } else if (range === 'all') {
+      fromInput.value = '';
+      toInput.value = '';
+    }
+    this.load();
+  },
+
+  resetFilters() {
+    document.getElementById('filterFromDate').value = '';
+    document.getElementById('filterToDate').value = '';
+    document.getElementById('filterType').value = 'ALL';
+    document.getElementById('filterSearch').value = '';
+    this.load();
+  },
+
+  async load() {
+    const fromDate = document.getElementById('filterFromDate')?.value || '';
+    const toDate = document.getElementById('filterToDate')?.value || '';
+    const type = document.getElementById('filterType')?.value || 'ALL';
+    const search = document.getElementById('filterSearch')?.value || '';
+
+    const params = new URLSearchParams();
+    if (fromDate) params.append('from_date', fromDate);
+    if (toDate) params.append('to_date', toDate);
+    if (type && type !== 'ALL') params.append('type', type);
+    if (search) params.append('search', search);
+
+    try {
+      const res = await fetch(`/api/customers?${params.toString()}`);
+      const data = await res.json();
+      this.rows = data.rows || [];
+      this.render();
+    } catch (e) {
+      if (window.showToast) showToast('Failed to load customers: ' + e.message, 'error');
+    }
+  },
+
+  render() {
+    const tbody = document.getElementById('tblBody');
+    const counter = document.getElementById('recordsCount');
+    if (counter) counter.textContent = `Showing ${this.rows.length} Customer(s)`;
+
+    if (this.rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">No customer entities found matching the selected date or search criteria.</td></tr>`;
+      return;
+    }
+
+    let html = '';
+    for (const r of this.rows) {
+      const typeBadgeClass = r.customer_type === 'FARMER' ? 'bg-success' : (r.customer_type === 'RETAILER' ? 'bg-primary' : 'bg-purple');
+      const statusBadge = r.is_active ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>' : '<span class="badge bg-secondary-subtle text-secondary border">Inactive</span>';
+      const createdDateStr = r.created_date || (r.created_at ? r.created_at.split('T')[0] : 'N/A');
+
+      html += `<tr>
+        <td class="ps-3 fw-bold text-muted">#${r.customer_id}</td>
+        <td><span class="badge bg-dark-subtle text-dark font-monospace">${r.customer_code}</span></td>
+        <td class="fw-semibold">${r.name || (r.first_name + ' ' + r.last_name)}</td>
+        <td><span class="badge ${typeBadgeClass}">${r.customer_type}</span></td>
+        <td><i class="bi bi-telephone text-muted me-1"></i>${r.phone || 'N/A'}</td>
+        <td class="small text-muted">${r.email || 'N/A'}</td>
+        <td class="small">${r.address || (r.city ? r.city : 'Nashik')}</td>
+        <td class="small text-nowrap"><i class="bi bi-calendar3 text-muted me-1"></i>${createdDateStr}</td>
+        <td>${statusBadge}</td>
+        <td class="text-end pe-3 text-nowrap">
+          ${this.user.role === 'admin' ? `
+            <button class="btn btn-sm btn-outline-primary py-0 px-2 me-1" onclick="ModuleCustomers.openEditModal(${r.customer_id})">
+              <i class="bi bi-pencil-square"></i> Edit
+            </button>
+            <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="ModuleCustomers.del(${r.customer_id})">
+              <i class="bi bi-trash"></i> Delete
+            </button>
+          ` : '<span class="badge bg-light text-muted">View Only</span>'}
+        </td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+
+  async openAddModal() {
+    document.getElementById('mdlTitle').innerHTML = '<i class="bi bi-person-plus-fill me-2"></i>Add New Customer';
+    document.getElementById('cust_id').value = '';
+    document.getElementById('cust_first_name').value = '';
+    document.getElementById('cust_last_name').value = '';
+    document.getElementById('cust_phone').value = '';
+    document.getElementById('cust_email').value = '';
+    document.getElementById('cust_type').value = 'FARMER';
+    document.getElementById('cust_status').value = '1';
+    document.getElementById('cust_address').value = '';
+    document.getElementById('cust_city').value = 'Nashik';
+    document.getElementById('cust_pincode').value = '422001';
+
+    // Fetch next auto code
+    const autoBox = document.getElementById('autoIdNotice');
+    autoBox.className = 'alert alert-success d-flex align-items-center mb-3 py-2';
+    try {
+      const res = await fetch('/api/customers/next-code');
+      const data = await res.json();
+      document.getElementById('autoIdText').innerHTML = `Code: <span class="badge bg-dark fs-6">${data.next_code}</span> (Auto-assigned)`;
+    } catch (e) {
+      document.getElementById('autoIdText').textContent = 'Code will be auto-generated sequentially on save.';
+    }
+
+    this.modal.show();
+  },
+
+  openEditModal(id) {
+    const r = this.rows.find(x => x.customer_id == id);
+    if (!r) return;
+
+    document.getElementById('mdlTitle').innerHTML = `<i class="bi bi-pencil-square me-2"></i>Edit Customer #${r.customer_id} (${r.customer_code})`;
+    document.getElementById('cust_id').value = r.customer_id;
+    document.getElementById('cust_first_name').value = r.first_name || '';
+    document.getElementById('cust_last_name').value = r.last_name || '';
+    document.getElementById('cust_phone').value = r.phone || '';
+    document.getElementById('cust_email').value = r.email || '';
+    document.getElementById('cust_type').value = r.customer_type || 'FARMER';
+    document.getElementById('cust_status').value = r.is_active ? '1' : '0';
+    document.getElementById('cust_address').value = r.address_line || r.address || '';
+    document.getElementById('cust_city').value = r.city || 'Nashik';
+    document.getElementById('cust_pincode').value = r.postal_code || '422001';
+
+    const autoBox = document.getElementById('autoIdNotice');
+    autoBox.className = 'alert alert-info d-flex align-items-center mb-3 py-2';
+    document.getElementById('autoIdText').innerHTML = `Customer Code: <span class="badge bg-primary fs-6">${r.customer_code}</span> | ID #${r.customer_id}`;
+
+    this.modal.show();
+  },
+
+  async save() {
+    const id = document.getElementById('cust_id').value;
+    const firstName = document.getElementById('cust_first_name').value.trim();
+    const lastName = document.getElementById('cust_last_name').value.trim();
+    if (!firstName || !lastName) {
+      if (window.showToast) showToast('Please enter both First Name and Last Name', 'error');
+      return;
+    }
+
+    const body = {
+      first_name: firstName,
+      last_name: lastName,
+      customer_type: document.getElementById('cust_type').value,
+      is_active: document.getElementById('cust_status').value === '1',
+      phone: document.getElementById('cust_phone').value.trim(),
+      email: document.getElementById('cust_email').value.trim(),
+      address_line: document.getElementById('cust_address').value.trim(),
+      city: document.getElementById('cust_city').value.trim(),
+      postal_code: document.getElementById('cust_pincode').value.trim()
+    };
+
+    try {
+      if (id) {
+        if (this.user.role !== 'admin') throw new Error('Only Administrator can edit customers');
+        const res = await fetch(`/api/customers/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (window.showToast) showToast(data.message || 'Customer updated successfully');
+      } else {
+        const res = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (window.showToast) showToast(`Customer Created: ${data.customer_code} (ID #${data.customer_id})`);
+      }
+
+      this.modal.hide();
+      this.load();
+    } catch (e) {
+      if (window.showToast) showToast(e.message, 'error');
+    }
+  },
+
+  async del(id) {
+    if (!confirm(`Are you sure you want to delete or deactivate Customer #${id}?`)) return;
+    try {
+      const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (window.showToast) showToast(data.message || 'Customer deleted successfully');
+      this.load();
+    } catch (e) {
+      if (window.showToast) showToast(e.message, 'error');
+    }
+  }
+};
+</script>

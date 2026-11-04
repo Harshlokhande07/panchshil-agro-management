@@ -1,0 +1,221 @@
+<div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Supplier &amp; Vendor Directory</h4>
+      <div class="text-muted small">Manage agricultural distributors, seed companies, and chemical suppliers</div>
+    </div>
+    <button class="btn btn-success btn-sm admin-only" id="btnAdd">
+      <i class="bi bi-plus-circle me-1"></i> Add Supplier
+    </button>
+  </div>
+
+  <!-- Search Card -->
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-center">
+        <div class="col-md-6">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+            <input class="form-control border-start-0 ps-0" id="search" placeholder="Search by supplier name, phone, email, or city...">
+          </div>
+        </div>
+        <div class="col-md-6 text-end">
+          <span class="small text-muted" id="suppCount">Loading suppliers...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suppliers Table Card -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0 table-responsive">
+      <table class="table table-hover align-middle mb-0" id="tblSuppliers">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">ID</th>
+            <th>Supplier / Company Name</th>
+            <th>Contact Phone</th>
+            <th>Email Address</th>
+            <th>Distribution City</th>
+            <th class="text-end pe-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tblBody">
+          <tr><td colspan="6" class="text-center py-4 text-muted">Loading suppliers...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Add/Edit Supplier Modal -->
+  <div class="modal fade" id="mdl" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold" id="mdlTitle">Supplier Details</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 row g-3">
+          <input type="hidden" id="id">
+          <div class="col-12">
+            <label class="form-label small fw-bold">Company / Supplier Name <span class="text-danger">*</span></label>
+            <input class="form-control form-control-sm" id="name" placeholder="e.g. Mahadhan Agro Ltd">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Contact Phone</label>
+            <input class="form-control form-control-sm" id="phone" placeholder="e.g. 9822012345">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Email Address</label>
+            <input type="email" class="form-control form-control-sm" id="email" placeholder="e.g. contact@supplier.com">
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-bold">City / Location</label>
+            <input class="form-control form-control-sm" id="city" placeholder="e.g. Nashik, Pune, Mumbai">
+          </div>
+        </div>
+        <div class="modal-footer bg-light py-2">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-sm btn-success px-3" id="btnSave">Save Supplier</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModuleSuppliers = {
+  user: null, rows: [], modal: null,
+  init(user) {
+    this.user = user;
+    const mdlEl = document.getElementById('mdl');
+    if (mdlEl) this.modal = new bootstrap.Modal(mdlEl);
+
+    if (user && user.role !== 'admin') {
+      const btnAdd = document.getElementById('btnAdd');
+      if (btnAdd) btnAdd.style.display = 'none';
+    }
+
+    const btnAdd = document.getElementById('btnAdd');
+    if (btnAdd) btnAdd.onclick = () => this.open();
+    const btnSave = document.getElementById('btnSave');
+    if (btnSave) btnSave.onclick = () => this.save();
+    const searchInput = document.getElementById('search');
+    if (searchInput) searchInput.oninput = () => this.render();
+
+    this.load();
+  },
+  async load() {
+    try {
+      const res = await fetch('/api/suppliers');
+      const data = await res.json();
+      this.rows = (data.rows || []).sort((a,b) => a.supplier_id - b.supplier_id);
+      this.render();
+    } catch(e) {
+      if (window.showToast) showToast('Failed to load suppliers: ' + e.message, 'error');
+    }
+  },
+  render() {
+    const q = (document.getElementById('search')?.value || '').toLowerCase().trim();
+    const list = this.rows.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
+
+    const countEl = document.getElementById('suppCount');
+    if (countEl) countEl.textContent = `Showing ${list.length} of ${this.rows.length} suppliers`;
+
+    const tbody = document.getElementById('tblBody');
+    if (!tbody) return;
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No suppliers found.</td></tr>';
+      return;
+    }
+
+    let html = '';
+    for (const r of list) {
+      html += `<tr>
+        <td class="ps-3 fw-bold text-muted">#${r.supplier_id}</td>
+        <td>
+          <div class="fw-semibold text-dark">${r.name}</div>
+        </td>
+        <td><span class="text-secondary small"><i class="bi bi-telephone me-1 text-muted"></i>${r.phone || '-'}</span></td>
+        <td><span class="text-secondary small"><i class="bi bi-envelope me-1 text-muted"></i>${r.email || '-'}</span></td>
+        <td><span class="badge bg-light text-secondary border">${r.city || 'Nashik'}</span></td>
+        <td class="text-end pe-3">
+          ${this.user && this.user.role === 'admin' ? `
+            <button class="btn btn-xs btn-outline-primary me-1" onclick="ModuleSuppliers.edit(${r.supplier_id})" title="Edit Supplier">
+              <i class="bi bi-pencil"></i> Edit
+            </button>
+            <button class="btn btn-xs btn-outline-danger" onclick="ModuleSuppliers.del(${r.supplier_id})" title="Delete Supplier">
+              <i class="bi bi-trash"></i>
+            </button>
+          ` : '<span class="text-muted small">View Only</span>'}
+        </td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  open(r = {}) {
+    document.getElementById('mdlTitle').textContent = r.supplier_id ? 'Edit Supplier #' + r.supplier_id : 'Add New Supplier';
+    document.getElementById('id').value = r.supplier_id || '';
+    document.getElementById('name').value = r.name || '';
+    document.getElementById('phone').value = r.phone || '';
+    document.getElementById('email').value = r.email || '';
+    document.getElementById('city').value = r.city || 'Nashik';
+    this.modal.show();
+  },
+  edit(id) {
+    const r = this.rows.find(x => x.supplier_id == id);
+    if (r) this.open(r);
+  },
+  async save() {
+    const id = document.getElementById('id').value;
+    const name = document.getElementById('name').value.trim();
+    if (!name) return showToast('Supplier name is required', 'error');
+
+    const body = {
+      name,
+      phone: document.getElementById('phone').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      city: document.getElementById('city').value.trim()
+    };
+
+    try {
+      if (id) {
+        const res = await fetch('/api/suppliers/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showToast('Supplier updated successfully');
+      } else {
+        const res = await fetch('/api/suppliers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showToast('Supplier added successfully');
+      }
+      this.modal.hide();
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  },
+  async del(id) {
+    if (!confirm(`Are you sure you want to delete supplier #${id}?`)) return;
+    try {
+      const res = await fetch('/api/suppliers/' + id, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast('Supplier deleted');
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  }
+};
+</script>

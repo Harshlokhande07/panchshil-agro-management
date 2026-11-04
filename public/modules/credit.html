@@ -1,0 +1,247 @@
+<div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Credit Accounts (Udhari)</h4>
+      <div class="text-muted small">Customer credit lines, receivables tracking, due dates &amp; collection status</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-warning btn-sm" id="btnOverdue">
+        <i class="bi bi-clock-history me-1"></i> Scan Overdue Dues
+      </button>
+      <button class="btn btn-success btn-sm" id="btnAdd">
+        <i class="bi bi-plus-circle me-1"></i> New Credit Record
+      </button>
+    </div>
+  </div>
+
+  <!-- Search & Filter Card -->
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-center">
+        <div class="col-md-5">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+            <input class="form-control border-start-0 ps-0" id="search" placeholder="Search customer, credit ID...">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select form-select-sm" id="filterStatus">
+            <option value="ALL">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Partial">Partial</option>
+            <option value="Overdue">Overdue</option>
+            <option value="Paid">Paid</option>
+          </select>
+        </div>
+        <div class="col-md-4 text-end">
+          <span class="small text-muted" id="creditCount">Loading credit records...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Credit Table Card -->
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0 table-responsive">
+      <table class="table table-hover align-middle mb-0" id="tblCredit">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Credit ID</th>
+            <th>Customer Name</th>
+            <th class="text-end">Total Due</th>
+            <th class="text-end">Amount Paid</th>
+            <th class="text-end">Balance Due</th>
+            <th class="text-center">Due Date</th>
+            <th class="text-center">Payment Status</th>
+            <th class="text-end pe-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tblBody">
+          <tr><td colspan="8" class="text-center py-4 text-muted">Loading credit accounts...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Create Credit Entry Modal -->
+  <div class="modal fade" id="mdl" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold">Create Credit Transaction</h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 row g-3">
+          <div class="col-12">
+            <label class="form-label small fw-bold">Select Customer <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="customer_id"></select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Credit Amount (₹) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control form-control-sm" id="total_due" placeholder="0.00">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Due Date <span class="text-danger">*</span></label>
+            <input type="date" class="form-control form-control-sm" id="due_date">
+          </div>
+        </div>
+        <div class="modal-footer bg-light py-2">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-sm btn-success px-3" id="btnSave">Save Credit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModuleCredit = {
+  user: null, rows: [], customers: [], modal: null,
+  init(user) {
+    this.user = user;
+    const mdlEl = document.getElementById('mdl');
+    if (mdlEl) this.modal = new bootstrap.Modal(mdlEl);
+
+    const btnAdd = document.getElementById('btnAdd');
+    if (btnAdd) btnAdd.onclick = () => this.open();
+    const btnSave = document.getElementById('btnSave');
+    if (btnSave) btnSave.onclick = () => this.save();
+    const btnOverdue = document.getElementById('btnOverdue');
+    if (btnOverdue) btnOverdue.onclick = () => this.markOverdue();
+
+    const searchInput = document.getElementById('search');
+    if (searchInput) searchInput.oninput = () => this.render();
+    const filterStatus = document.getElementById('filterStatus');
+    if (filterStatus) filterStatus.onchange = () => this.render();
+
+    this.load();
+  },
+  async load() {
+    try {
+      const [cr, cs] = await Promise.all([fetch('/api/credit'), fetch('/api/customers')]);
+      const c = await cr.json();
+      const s = await cs.json();
+      this.rows = c.rows || [];
+      this.customers = s.rows || [];
+
+      const sel = document.getElementById('customer_id');
+      if (sel) {
+        sel.innerHTML = this.customers.map(x => `<option value="${x.customer_id}">${x.name} (${x.phone || 'No Phone'})</option>`).join('');
+      }
+
+      this.render();
+    } catch(e) {
+      if (window.showToast) showToast('Failed to load credit accounts: ' + e.message, 'error');
+    }
+  },
+  render() {
+    const q = (document.getElementById('search')?.value || '').toLowerCase().trim();
+    const stVal = document.getElementById('filterStatus')?.value || 'ALL';
+
+    const list = this.rows.filter(r => {
+      const matchSearch = !q || JSON.stringify(r).toLowerCase().includes(q);
+      const matchStatus = stVal === 'ALL' || (r.status && r.status.toLowerCase() === stVal.toLowerCase());
+      return matchSearch && matchStatus;
+    });
+
+    const countEl = document.getElementById('creditCount');
+    if (countEl) countEl.textContent = `Showing ${list.length} of ${this.rows.length} accounts`;
+
+    const tbody = document.getElementById('tblBody');
+    if (!tbody) return;
+
+    if (list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No matching credit accounts found.</td></tr>';
+      return;
+    }
+
+    const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let html = '';
+
+    for (const r of list) {
+      let badge = 'bg-secondary';
+      if (r.status === 'Pending') badge = 'bg-warning-subtle text-warning-emphasis border border-warning-subtle';
+      else if (r.status === 'Partial') badge = 'bg-info-subtle text-info border border-info-subtle';
+      else if (r.status === 'Paid') badge = 'bg-success-subtle text-success border border-success-subtle';
+      else if (r.status === 'Overdue') badge = 'bg-danger-subtle text-danger border border-danger-subtle';
+
+      const isOverdue = r.status === 'Overdue';
+
+      html += `<tr class="${isOverdue ? 'table-danger-subtle' : ''}">
+        <td class="ps-3 fw-bold text-muted">#${r.credit_id}</td>
+        <td>
+          <span class="fw-semibold text-dark">${r.customer_name || 'Customer'}</span>
+          <span class="badge bg-light text-muted border ms-1">#${r.customer_id}</span>
+        </td>
+        <td class="text-end text-muted">${formatCurr(r.total_due)}</td>
+        <td class="text-end text-success">${formatCurr(r.amount_paid)}</td>
+        <td class="text-end fw-bold ${Number(r.balance) > 0 ? 'text-danger' : 'text-dark'}">${formatCurr(r.balance)}</td>
+        <td class="text-center small text-secondary">${r.due_date ? String(r.due_date).slice(0, 10) : '-'}</td>
+        <td class="text-center"><span class="badge ${badge}">${r.status}</span></td>
+        <td class="text-end pe-3">
+          ${this.user && this.user.role === 'admin' ? `
+            <button class="btn btn-xs btn-outline-danger" onclick="ModuleCredit.del(${r.credit_id})" title="Delete Transaction">
+              <i class="bi bi-trash"></i>
+            </button>
+          ` : '<span class="text-muted small">-</span>'}
+        </td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  open() {
+    document.getElementById('total_due').value = '';
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    document.getElementById('due_date').value = d.toISOString().slice(0, 10);
+    this.modal.show();
+  },
+  async save() {
+    const cid = document.getElementById('customer_id').value;
+    const due = Number(document.getElementById('total_due').value);
+    const dueDate = document.getElementById('due_date').value;
+
+    if (!cid) return showToast('Please select a customer', 'error');
+    if (!due || due <= 0) return showToast('Please enter a valid credit amount', 'error');
+
+    const body = { customer_id: cid, total_due: due, due_date: dueDate || null };
+    try {
+      const res = await fetch('/api/credit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      this.modal.hide();
+      showToast('Credit entry created successfully');
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  },
+  async markOverdue() {
+    try {
+      const res = await fetch('/api/credit/mark-overdue', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast(`Scan complete: ${data.affectedRows || 0} overdue records identified`);
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  },
+  async del(id) {
+    if (!confirm(`Are you sure you want to delete credit record #${id}?`)) return;
+    try {
+      const res = await fetch('/api/credit/' + id, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast('Credit record deleted');
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  }
+};
+</script>

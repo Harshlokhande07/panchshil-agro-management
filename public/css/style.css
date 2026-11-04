@@ -1,0 +1,92 @@
+/* Panchshil Agro - Green and white agriculture theme */
+:root {
+  --agro-green: #1f7c3f;
+  --agro-green-dark: #166534;
+  --agro-bg: #f6fff9;
+}
+
+body {
+  background: var(--agro-bg);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.login-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.login-card {
+  width: 380px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(31,124,63,0.15);
+  padding: 28px;
+  border-top: 4px solid var(--agro-green);
+}
+
+.topbar {
+  background: linear-gradient(90deg, var(--agro-green) 0%, var(--agro-green-dark) 100%);
+  color: #fff;
+}
+
+.sidebar {
+  background: #fff;
+  border-right: 1px solid #e6f4ea;
+  min-height: calc(100vh - 56px);
+}
+
+.nav-link {
+  color: #1f2937;
+  border-radius: 8px;
+  margin: 2px 8px;
+}
+
+.nav-link.active, .nav-link:hover {
+  background: #e8f5ee;
+  color: var(--agro-green-dark);
+}
+
+.card {
+  border: none;
+  box-shadow: 0 4px 20px rgba(15, 118, 110, 0.06);
+  border-radius: 12px;
+}
+
+.card-header {
+  background: #fff;
+  border-bottom: 1px solid #f0fdf4;
+  font-weight: 600;
+}
+
+.badge-red { background: #dc2626; }
+.badge-amber { background: #f59e0b; color: #1f2937; }
+.badge-green { background: #22c55e; }
+.bg-purple { background-color: #8b5cf6 !important; color: #fff !important; }
+.btn-xs { font-size: 11px; padding: 2px 8px; }
+
+.table th { background: #f8fffb; }
+
+.table td, .table th {
+  vertical-align: middle;
+}
+
+.query-box {
+  display: none !important;
+}
+
+/* Subtle badges for clean visual status */
+.bg-success-subtle { background-color: #dcfce7 !important; color: #15803d !important; }
+.bg-warning-subtle { background-color: #fef9c3 !important; color: #a16207 !important; }
+.bg-danger-subtle { background-color: #fee2e2 !important; color: #b91c1c !important; }
+.bg-info-subtle { background-color: #e0f2fe !important; color: #0369a1 !important; }
+.bg-primary-subtle { background-color: #e0e7ff !important; color: #4338ca !important; }
+.table-danger-subtle { background-color: #fff1f2 !important; }
+
+.toast-container {
+  position: fixed;
+  top: 70px;
+  right: 16px;
+  z-index: 1100;
+}

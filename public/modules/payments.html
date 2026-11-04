@@ -1,0 +1,334 @@
+<div>
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Payment Transactions &amp; Receipts</h4>
+      <div class="text-muted small">Record incoming customer payments, reconcile credit accounts, track collections</div>
+    </div>
+    <button class="btn btn-success btn-sm" id="btnAdd">
+      <i class="bi bi-cash me-1"></i> Record Payment
+    </button>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <!-- Recent Payments Table -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary">
+            <i class="bi bi-receipt text-success me-2"></i>Recent Payment Receipts
+          </span>
+          <span class="badge bg-light text-secondary border">Ordered by Date</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblPayments">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">ID</th>
+                <th>Receipt / Order</th>
+                <th>Customer</th>
+                <th class="text-end">Amount Paid</th>
+                <th class="text-center">Mode</th>
+                <th class="pe-3 text-end">Date</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody">
+              <tr><td colspan="6" class="text-center py-4 text-muted">Loading payments...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total Paid Per Customer -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary">
+            <i class="bi bi-people text-success me-2"></i>Cumulative Customer Collections
+          </span>
+          <span class="badge bg-light text-secondary border">Top Payers</span>
+        </div>
+        <div class="card-body p-0 table-responsive" style="max-height: 440px;">
+          <table class="table table-hover align-middle mb-0" id="tblTotals">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th class="ps-3">Customer Name</th>
+                <th class="text-center">Receipts</th>
+                <th class="pe-3 text-end">Total Collected</th>
+              </tr>
+            </thead>
+            <tbody id="tblTotalsBody">
+              <tr><td colspan="3" class="text-center py-4 text-muted">Loading totals...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Outstanding Customer Balances -->
+    <div class="col-lg-12">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-bold text-secondary">
+            <i class="bi bi-exclamation-circle text-danger me-2"></i>Current Outstanding Balances
+          </span>
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Receivables</span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" id="tblOut">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Customer ID</th>
+                <th>Customer Name</th>
+                <th>Phone Number</th>
+                <th class="text-end">Credit Limit</th>
+                <th class="text-end">Current Outstanding</th>
+                <th class="pe-3 text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="tblOutBody">
+              <tr><td colspan="6" class="text-center py-4 text-muted">Loading outstanding receivables...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record Payment Modal -->
+  <div class="modal fade" id="mdl" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-light">
+          <h5 class="modal-title fw-bold">
+            <i class="bi bi-currency-rupee text-success me-1"></i>Record Customer Payment
+          </h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4 row g-3">
+          <div class="col-12">
+            <label class="form-label small fw-bold">Customer <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="customer_id"></select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-bold">Link to Credit Due (Optional)</label>
+            <select class="form-select form-select-sm" id="credit_id">
+              <option value="">Direct Sale (No Credit Account)</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Payment Amount (₹) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" class="form-control form-control-sm" id="amount" placeholder="0.00">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Payment Mode <span class="text-danger">*</span></label>
+            <select class="form-select form-select-sm" id="mode">
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer bg-light py-2">
+          <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-sm btn-success px-3" id="btnSave">Confirm Payment</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModulePayments = {
+  user: null, payments: [], customers: [], credits: [], modal: null,
+  init(user) {
+    this.user = user;
+    const mdlEl = document.getElementById('mdl');
+    if (mdlEl) this.modal = new bootstrap.Modal(mdlEl);
+
+    const btnAdd = document.getElementById('btnAdd');
+    if (btnAdd) btnAdd.onclick = () => this.open();
+    const btnSave = document.getElementById('btnSave');
+    if (btnSave) btnSave.onclick = () => this.save();
+
+    const custSel = document.getElementById('customer_id');
+    if (custSel) custSel.onchange = () => this.loadCreditsForCustomer();
+
+    this.load();
+  },
+  async load() {
+    try {
+      const [pmRes, csRes, crRes, ptRes, voRes] = await Promise.all([
+        fetch('/api/payments'),
+        fetch('/api/customers'),
+        fetch('/api/credit'),
+        fetch('/api/payments/totals-per-customer'),
+        fetch('/api/payments/outstanding-view')
+      ]);
+
+      const pm = await pmRes.json();
+      const cs = await csRes.json();
+      const cr = await crRes.json();
+      const ptData = await ptRes.json();
+      const voData = await voRes.json();
+
+      this.payments = pm.rows || [];
+      this.customers = cs.rows || [];
+      this.credits = cr.rows || [];
+
+      const sel = document.getElementById('customer_id');
+      if (sel) {
+        sel.innerHTML = this.customers.map(x => `<option value="${x.customer_id}">${x.name} (${x.phone || 'No Phone'})</option>`).join('');
+      }
+
+      this.renderPayments();
+      this.renderTotals(ptData.rows || []);
+      this.renderOut(voData.rows || []);
+      this.loadCreditsForCustomer();
+    } catch(e) {
+      if (window.showToast) showToast('Failed to load payments: ' + e.message, 'error');
+    }
+  },
+  renderPayments() {
+    const tbody = document.getElementById('tblBody');
+    if (!tbody) return;
+
+    if (!this.payments || this.payments.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No payment records found.</td></tr>';
+      return;
+    }
+
+    const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let html = '';
+
+    for (const r of this.payments) {
+      let modeBadge = 'bg-secondary';
+      const m = String(r.mode || '').toUpperCase();
+      if (m === 'CASH') modeBadge = 'bg-success-subtle text-success border border-success-subtle';
+      else if (m === 'UPI') modeBadge = 'bg-info-subtle text-info border border-info-subtle';
+      else if (m === 'CARD') modeBadge = 'bg-primary-subtle text-primary border border-primary-subtle';
+
+      const pDate = r.payment_date || (r.paid_at ? String(r.paid_at).slice(0, 10) : '-');
+
+      html += `<tr>
+        <td class="ps-3 fw-bold text-muted">#${r.payment_id}</td>
+        <td>
+          <div class="fw-semibold text-dark"><code>${r.reference_code || 'ORD-' + r.order_id}</code></div>
+          <div class="text-muted small">Order #${r.order_id || '-'}</div>
+        </td>
+        <td>
+          <div class="fw-semibold text-dark">${r.customer_name || 'Walk-in'}</div>
+          ${r.customer_id ? `<div class="text-muted small">Cust #${r.customer_id}</div>` : ''}
+        </td>
+        <td class="text-end fw-bold text-success">${formatCurr(r.amount)}</td>
+        <td class="text-center"><span class="badge ${modeBadge}">${r.mode || 'CASH'}</span></td>
+        <td class="pe-3 text-end small text-secondary">${pDate}</td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  renderTotals(rows) {
+    const tbody = document.getElementById('tblTotalsBody');
+    if (!tbody) return;
+
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">No cumulative data found.</td></tr>';
+      return;
+    }
+
+    const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let html = '';
+
+    for (const r of rows) {
+      html += `<tr>
+        <td class="ps-3">
+          <div class="fw-semibold text-dark">${r.name}</div>
+          <div class="text-muted small">Customer #${r.customer_id}</div>
+        </td>
+        <td class="text-center"><span class="badge bg-light text-secondary border">${r.num_payments || 0}</span></td>
+        <td class="pe-3 text-end fw-bold text-dark">${formatCurr(r.total_paid)}</td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  renderOut(rows) {
+    const tbody = document.getElementById('tblOutBody');
+    if (!tbody) return;
+
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No outstanding receivables found.</td></tr>';
+      return;
+    }
+
+    const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let html = '';
+
+    for (const r of rows) {
+      html += `<tr>
+        <td class="ps-3 fw-bold text-muted">#${r.customer_id}</td>
+        <td class="fw-semibold text-dark">${r.name || 'Customer'}</td>
+        <td class="text-secondary small">${r.phone || '-'}</td>
+        <td class="text-end text-muted">${formatCurr(r.credit_limit || 50000)}</td>
+        <td class="text-end fw-bold text-danger">${formatCurr(r.outstanding)}</td>
+        <td class="pe-3 text-end">
+          <button class="btn btn-xs btn-outline-success" onclick="ModulePayments.payForCustomer(${r.customer_id}, ${r.outstanding})">
+            <i class="bi bi-cash me-1"></i> Settle
+          </button>
+        </td>
+      </tr>`;
+    }
+    tbody.innerHTML = html;
+  },
+  loadCreditsForCustomer() {
+    const cid = document.getElementById('customer_id')?.value;
+    const sel = document.getElementById('credit_id');
+    if (!sel) return;
+
+    sel.innerHTML = '<option value="">Direct Sale (No Credit Account)</option>';
+    const formatCurr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    for (const cr of this.credits) {
+      if (cr.customer_id == cid && cr.status !== 'Paid') {
+        sel.innerHTML += `<option value="${cr.credit_id}">Credit #${cr.credit_id} | Balance Due: ${formatCurr(cr.balance)} | Due: ${cr.due_date || 'N/A'}</option>`;
+      }
+    }
+  },
+  payForCustomer(cid, amt) {
+    document.getElementById('customer_id').value = cid;
+    this.loadCreditsForCustomer();
+    document.getElementById('amount').value = amt > 0 ? amt : '';
+    this.modal.show();
+  },
+  open() {
+    document.getElementById('amount').value = '';
+    this.loadCreditsForCustomer();
+    this.modal.show();
+  },
+  async save() {
+    const cid = document.getElementById('customer_id').value;
+    const crid = document.getElementById('credit_id').value;
+    const amt = Number(document.getElementById('amount').value);
+    const mode = document.getElementById('mode').value;
+
+    if (!cid) return showToast('Please select a customer', 'error');
+    if (!amt || amt <= 0) return showToast('Please enter a valid payment amount', 'error');
+
+    const body = { customer_id: cid, credit_id: crid || null, amount: amt, mode };
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      this.modal.hide();
+      showToast('Payment recorded successfully: ' + (data.reference_code || ''));
+      this.load();
+    } catch(e) {
+      showToast(e.message, 'error');
+    }
+  }
+};
+</script>

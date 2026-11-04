@@ -1,0 +1,120 @@
+<div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold text-dark">Database Users &amp; Role-Based Privileges</h4>
+      <div class="text-muted small">Manage MySQL database users, grants, roles &amp; access control</div>
+    </div>
+    <button class="btn btn-sm btn-outline-success" onclick="ModPriv.load()">
+      <i class="bi bi-arrow-repeat me-1"></i> Refresh Grants
+    </button>
+  </div>
+
+  <!-- SHOW GRANTS Section -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3 border-bottom">
+      <span class="fw-bold text-secondary">
+        <i class="bi bi-shield-lock text-success me-2"></i>Active MySQL User Grants (SHOW GRANTS)
+      </span>
+    </div>
+    <div class="card-body">
+      <div id="grants" class="row g-3">
+        <div class="col-12 text-center py-4 text-muted">
+          Click "Refresh Grants" to inspect MySQL database role assignments.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive GRANT / REVOKE Demo -->
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white py-3 border-bottom">
+      <span class="fw-bold text-secondary">
+        <i class="bi bi-toggles text-primary me-2"></i>Live Dynamic Privilege Management (GRANT / REVOKE)
+      </span>
+    </div>
+    <div class="card-body p-4">
+      <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-sm btn-outline-danger" onclick="ModPriv.revoke()">
+          <i class="bi bi-slash-circle me-1"></i> Revoke INSERT on Payment from shop_staff
+        </button>
+        <button class="btn btn-sm btn-outline-success" onclick="ModPriv.grant()">
+          <i class="bi bi-check-circle me-1"></i> Grant INSERT on Payment to shop_staff
+        </button>
+      </div>
+      <div id="privRes"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.ModulePrivileges = window.ModPriv = {
+  init() {
+    this.load();
+  },
+  async load() {
+    const cont = document.getElementById('grants');
+    cont.innerHTML = '<div class="col-12 text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-success me-2"></div>Fetching active grants...</div>';
+    
+    try {
+      const res = await fetch('/api/privileges/grants');
+      const data = await res.json();
+      cont.innerHTML = '';
+      
+      for (const [userKey, grants] of Object.entries(data.results)) {
+        const grantLines = Array.isArray(grants) ? grants : [grants];
+        
+        let roleBadge = 'bg-secondary';
+        if (userKey.includes('owner')) roleBadge = 'bg-success';
+        else if (userKey.includes('staff')) roleBadge = 'bg-primary';
+        else if (userKey.includes('accountant')) roleBadge = 'bg-info text-dark';
+
+        let html = `
+          <div class="col-lg-4 col-md-6">
+            <div class="card border h-100 shadow-sm">
+              <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-dark font-monospace">${userKey}</span>
+                <span class="badge ${roleBadge}">Database Role</span>
+              </div>
+              <div class="card-body p-3">
+                <div class="small fw-bold text-muted mb-2">Granted Permissions:</div>
+                <ul class="list-group list-group-flush small">`;
+        
+        for (const g of grantLines) {
+          html += `<li class="list-group-item px-0 py-1 border-0"><code class="text-dark">${g}</code></li>`;
+        }
+        
+        html += `</ul></div></div></div>`;
+        cont.innerHTML += html;
+      }
+    } catch(e) {
+      cont.innerHTML = `<div class="col-12 alert alert-danger">Failed to fetch grants: ${e.message}</div>`;
+    }
+  },
+  async revoke() {
+    const resDiv = document.getElementById('privRes');
+    resDiv.innerHTML = '<div class="text-muted small">Executing REVOKE statement...</div>';
+    try {
+      const res = await fetch('/api/privileges/revoke-staff-insert', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      resDiv.innerHTML = `<div class="alert alert-warning py-2 small mb-0"><i class="bi bi-exclamation-triangle me-1"></i> Privilege Revoked: <code>REVOKE INSERT ON payments FROM 'shop_staff'@'localhost'</code> executed.</div>`;
+      this.load();
+    } catch(e) {
+      resDiv.innerHTML = `<div class="alert alert-danger py-2 small mb-0">${e.message}</div>`;
+    }
+  },
+  async grant() {
+    const resDiv = document.getElementById('privRes');
+    resDiv.innerHTML = '<div class="text-muted small">Executing GRANT statement...</div>';
+    try {
+      const res = await fetch('/api/privileges/grant-staff-insert', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      resDiv.innerHTML = `<div class="alert alert-success py-2 small mb-0"><i class="bi bi-check-circle me-1"></i> Privilege Granted: <code>GRANT INSERT ON payments TO 'shop_staff'@'localhost'</code> executed.</div>`;
+      this.load();
+    } catch(e) {
+      resDiv.innerHTML = `<div class="alert alert-danger py-2 small mb-0">${e.message}</div>`;
+    }
+  }
+};
+</script>

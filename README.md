@@ -1,166 +1,200 @@
-# Panchshil Agro Agencies - Agro Shop Inventory & Credit Management System (DBMS Lab Practical 5)
+# Panchshil Agro Management
 
-A beginner-friendly web application built for the college DBMS Lab to demonstrate **Creation, Modification, Manipulation, Authorization and Views** of a MySQL database, with frontend-backend database connectivity. 
+A browser-based inventory and credit-management application for an agricultural supply shop. It uses a plain HTML/CSS/JavaScript frontend, a Node.js/Express API, and a MySQL database.
 
-- **Database:** MySQL 8 (`PanchshilAgro`) - structure defined by `PanchshilAgro_MySQL.sql` (7 tables). No existing table structure was changed. Only the new table `app_user` was added for web login.
-- **Backend:** Node.js + Express (`mysql2` with connection pool, **parameterized queries only**)
-- **Frontend:** Plain HTML, CSS, JavaScript + Bootstrap 5 (no heavy framework)
-- **Auth:** Session-based login with role-based access control (admin/staff/accountant)
+## Architecture
 
-## Tech Stack
-- Node.js + Express
-- mysql2
-- express-session
-- bcryptjs
-- dotenv
-- Bootstrap 5 + Chart.js (CDN)
+```mermaid
+flowchart LR
+    Browser["Browser\nHTML, CSS, JavaScript"]
+    Shell["SPA shell\npublic/app.html + public/js/app.js"]
+    Modules["Feature modules\npublic/modules/*.html"]
+    API["Express application\nserver.js"]
+    Auth["Session and role middleware\nmiddleware/auth.js"]
+    Routes["REST API route modules\nroutes/*.js"]
+    Pool["MySQL connection pool\ndb/pool.js"]
+    DB[("MySQL 8\nPanchshilAgro")]
 
-## Folder Structure
+    Browser --> Shell
+    Shell --> Modules
+    Modules -->|"fetch /api/*"| API
+    API --> Auth
+    Auth --> Routes
+    Routes --> Pool
+    Pool --> DB
+    API -->|"serves public/*"| Browser
 ```
+
+### Request and startup flow
+
+1. `server.js` loads environment variables, configures Express JSON/form parsing, cookie-based sessions, and serves the `public/` directory.
+2. Before listening, the server verifies MySQL access, runs `db/ensureAppSchema.js`, and ensures the `app_user` login table exists. The schema setup adds the app-specific product brand, price audit, and inventory batch tables and copies current aggregate inventory into opening batches where needed.
+3. The login page sends credentials to `POST /api/login`. Passwords are checked against bcrypt hashes in `app_user`; the authenticated user's ID, username, and role are kept in the session.
+4. The SPA shell loads feature HTML modules into `#moduleContainer`. Module scripts call the same-origin `/api/*` endpoints and render the returned JSON.
+5. `requireLogin` protects feature APIs, and `requireRole` applies additional role restrictions. Routes use the shared MySQL pool and parameterized queries.
+
+## Application modules and API
+
+| Frontend module | API prefix | Purpose |
+|---|---|---|
+| Dashboard | `/api/dashboard` | Business totals, category, supplier, payment, and credit summaries |
+| Suppliers | `/api/suppliers` | Supplier directory and maintenance |
+| Customers | `/api/customers` | Customer records, addresses, search, filters, and customer codes |
+| Products | `/api/products` | Product catalog, supplier costs, and price audit history |
+| Inventory | `/api/inventory` | Batch stock, warehouse totals, expiring stock, and godown-to-shelf transfers |
+| Credit | `/api/credit` | Credit charges, balances, overdue reporting, and entries |
+| Payments | `/api/payments` | Payment records, customer totals, and outstanding balances |
+| Warranty | `/api/warranty` | Warranty claims and claim-status updates |
+| Views & Routines | `/api/routines` | Database views, stored routines, and helper queries |
+| DB Users & Privileges | `/api/privileges` | MySQL grants and privilege demonstrations (admin only) |
+| SQL log | `/api/sql` | SQL log endpoint |
+| Authentication | `/api/login`, `/api/logout`, `/api/me` | Login, logout, and current session |
+
+Feature routes are registered in `server.js`; their implementations are in `routes/`. Static module pages live in `public/modules/`, with shared SPA navigation and module loading in `public/js/app.js`.
+
+## Database architecture
+
+The application targets the normalized MySQL 8 schema created by `PanchshilAgro_Complete (1).sql`. Important entities and relationships:
+
+- **Customers and credit:** `customers` has customer identity and contact fields; `customer_addresses` stores addresses. Each customer can have a `credit_accounts` record with a ledger in `credit_transactions` (`CHARGE`, `PAYMENT`, or `ADJUSTMENT`). `v_credit_balances` derives outstanding and available credit.
+- **Catalog and suppliers:** `products` reference `categories` and `units`. Products and suppliers are many-to-many through `product_suppliers`, which stores quoted costs. `product_brands` stores the optional brand field used by the app.
+- **Warehouses and inventory:** `inventory` stores the total quantity for each warehouse/product pair. `inventory_batches` stores batch number, expiry, shelf quantity, and godown quantity; its rows contribute to the warehouse/product total. `inventory_movements` records stock adjustments and other stock events.
+- **Purchasing:** `purchase_orders` and `purchase_order_items` record supplier purchases and their products.
+- **Sales and payments:** `sales_orders` and `sales_order_items` record customer orders; `payments` are associated with sales orders; `shipments` track delivery.
+- **Warranty:** `warranty_policies` and `product_warranties` describe product coverage; `warranty_claims` ties a claim to an order and product.
+- **Application access and audit:** `app_user` stores web login hashes and roles. `product_price_audit` records product price changes.
+- **Reporting objects:** the main schema also defines views, functions, procedures, and triggers. The dashboard and routines modules use these alongside direct queries.
+
+### Entity relationship diagram
+
+The solid relationships below are enforced by foreign keys in the main SQL schema. `inventory_batches`, `product_brands`, and `product_price_audit` are app-support tables created by `db/ensureAppSchema.js`; their associations are maintained by the application.
+
+```mermaid
+erDiagram
+    CUSTOMERS ||--o{ CUSTOMER_ADDRESSES : has
+    CUSTOMERS ||--o| CREDIT_ACCOUNTS : receives
+    CREDIT_ACCOUNTS ||--o{ CREDIT_TRANSACTIONS : records
+    CUSTOMERS ||--o{ SALES_ORDERS : places
+    WAREHOUSES ||--o{ SALES_ORDERS : fulfills
+
+    CATEGORIES ||--o{ PRODUCTS : classifies
+    UNITS ||--o{ PRODUCTS : measures
+    PRODUCTS ||--o{ PRODUCT_SUPPLIERS : sourced_from
+    SUPPLIERS ||--o{ PRODUCT_SUPPLIERS : supplies
+
+    WAREHOUSES ||--o{ INVENTORY : stores
+    PRODUCTS ||--o{ INVENTORY : stocked_as
+    INVENTORY ||--o{ INVENTORY_MOVEMENTS : tracks
+    SALES_ORDERS ||--o{ INVENTORY_MOVEMENTS : may_cause
+    PURCHASE_ORDERS ||--o{ INVENTORY_MOVEMENTS : may_cause
+    PRODUCTS ||--o{ INVENTORY_BATCHES : divided_into
+    WAREHOUSES ||--o{ INVENTORY_BATCHES : holds
+
+    SUPPLIERS ||--o{ PURCHASE_ORDERS : receives
+    WAREHOUSES ||--o{ PURCHASE_ORDERS : delivers_to
+    PURCHASE_ORDERS ||--o{ PURCHASE_ORDER_ITEMS : contains
+    PRODUCTS ||--o{ PURCHASE_ORDER_ITEMS : purchased_as
+
+    SALES_ORDERS ||--o{ SALES_ORDER_ITEMS : contains
+    PRODUCTS ||--o{ SALES_ORDER_ITEMS : sold_as
+    SALES_ORDERS ||--o{ PAYMENTS : paid_by
+    SALES_ORDERS ||--o| SHIPMENTS : ships_as
+
+    PRODUCTS ||--o| PRODUCT_WARRANTIES : covered_by
+    WARRANTY_POLICIES ||--o{ PRODUCT_WARRANTIES : defines
+    SALES_ORDER_ITEMS ||--o{ WARRANTY_CLAIMS : may_generate
+```
+
+### Schema files
+
+> **Important:** Do not run these SQL files interchangeably. They describe different generations of the database.
+
+- **Application schema:** `PanchshilAgro_Complete (1).sql` is the schema expected by the app. It starts with `DROP DATABASE IF EXISTS PanchshilAgro` and permanently deletes an existing database with that name. Only run it when intentionally creating a fresh database and after backing up any data.
+- **Legacy practical schema:** `PanchshilAgro_MySQL.sql` creates a different, seven-table schema. It does not contain the normalized tables expected by the application.
+- **Legacy practical routines:** `PanchshilAgro_Practical_4.sql` targets the seven-table schema above. It truncates/reloads data and recreates objects; it is not the application schema setup.
+
+Use the application schema for this web app. Do not execute the legacy practical scripts against the app database unless you intentionally want to rebuild/migrate the database and have reviewed their effects.
+
+## Project layout
+
+```text
 .
-├── .env.example
-├── .gitignore
-├── PanchshilAgro_MySQL.sql        # Creates DB + 7 tables (source of truth)
-├── PanchshilAgro_Practical_4.sql # Views, Procedures, Functions, Triggers, Sample data, Users/Roles
-├── package.json
-├── README.md
-├── server.js
 ├── db/
-│   ├── app_user.sql
-│   ├── pool.js
-│   └── seedAppUsers.js
+│   ├── app_user.sql           # Web login table definition
+│   ├── ensureAppSchema.js     # App-specific schema setup and opening-batch migration
+│   ├── pool.js                # Shared mysql2 promise pool
+│   └── seedAppUsers.js        # Seeds demo logins
 ├── middleware/
-│   └── auth.js
+│   └── auth.js                # Login and role checks
 ├── public/
-│   ├── app.html
+│   ├── app.html               # SPA shell and navigation
 │   ├── login.html
 │   ├── css/style.css
-│   ├── js/app.js
+│   ├── js/app.js              # SPA navigation and module loader
 │   ├── js/login.js
-│   └── modules/*.html
-└── routes/
-    ├── credit.js
-    ├── customers.js
-    ├── dashboard.js
-    ├── inventory.js
-    ├── payments.js
-    ├── privileges.js
-    ├── products.js
-    ├── routines.js
-    ├── sql.js
-    ├── suppliers.js
-    └── warranty.js
+│   └── modules/               # Dashboard and feature screens
+├── routes/                    # Express API route modules
+├── .env.example               # Environment variable template
+├── package.json
+├── server.js                  # Express app and startup sequence
+└── PanchshilAgro_Complete (1).sql
 ```
 
-## ER-to-Table Summary (with relationships)
-**7 business tables (from `PanchshilAgro_MySQL.sql`):**
-1. `Customer(customer_id PK, name, phone, address)`
-2. `Supplier(supplier_id PK, name, phone, email)`
-3. `Product(product_id PK, supplier_id FK -> Supplier, product_name, category(Fertilizer/Pesticide/Seed/Equipment), brand, purchase_price, selling_price, min_stock)`
-4. `Inventory(inventory_id PK, product_id FK -> Product, batch_no, expiry_date NULL, shelf_qty, godown_qty)` - `UNIQUE(product_id,batch_no)`
-5. `Credit(credit_id PK, customer_id FK -> Customer, total_due, amount_paid, due_date, status ENUM('Pending','Partial','Paid','Overdue'))`
-6. `Payment(payment_id PK, customer_id FK -> Customer, credit_id FK NULL -> Credit, amount, payment_date, mode ENUM('Cash','UPI','Card'))` - `credit_id NULL` for direct cash sales
-7. `Warranty(warranty_id PK, product_id FK -> Product, customer_id FK -> Customer, batch_no, start_date, end_date, return_reason, supplier_status ENUM('Sent','Replaced','Rejected'))`
+## Requirements
 
-**Additional tables/objects used:**
-- `Price_Audit(audit_id PK, product_id, old_price, new_price, changed_on)` - created by `PanchshilAgro_Practical_4.sql` via trigger `trg_product_after_update`
-- `app_user(user_id PK, username UNIQUE, password_hash(bcrypt), role ENUM('admin','staff','accountant'), created_at)` - **only new table added by this app**
+- Node.js 18 or later
+- MySQL 8.0.16 or later
+- A MySQL account with access to the application database and permission to create the app's supporting tables on first startup
 
-**Relationships:**
-- Supplier 1:N Product
-- Product 1:N Inventory, Product 1:N Warranty
-- Customer 1:N Credit, Customer 1:N Payment, Customer 1:N Warranty
-- Credit 1:N Payment
+## Run locally
 
-## Setup Steps (Numbered)
-1. **Start MySQL** (MySQL 8) and open MySQL Workbench / CLI as root/admin.
-2. **Create database and base tables:** Run `PanchshilAgro_MySQL.sql` in MySQL. This creates database `PanchshilAgro` and the 7 tables.
-3. **Create views, procedures, functions, triggers, sample data & MySQL users/roles:** Run `PanchshilAgro_Practical_4.sql`.  
-   - *Note:* This file reloads sample data each time it runs (truncates tables).  
-   - *Note:* Part E creates MySQL users/roles (`shop_owner`, `shop_staff`, `shop_accountant`, `agro_report_viewer`). If you don't have privileges to create users, you may skip that section - the app's **"DB Users & Privileges"** page will still display grants if users exist, or show errors gracefully.
-4. **Install Node dependencies:** In this project folder, open terminal and run `npm install`.
-5. **Configure environment:** Copy `.env.example` to `.env` and fill in `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME=PanchshilAgro`, `SESSION_SECRET` (long random string), `PORT` (default 3000).
-6. **Create and seed app users:** Run `npm run seed:users`. This creates the `app_user` table (if missing) and seeds one user per role with **bcrypt** hashed passwords.
-7. **Start the server:** Run `npm start` (or `npm run dev`). Open [http://localhost:3000](http://localhost:3000).
+1. Create a backup of any existing database named `PanchshilAgro`.
+2. To create a fresh database, run `PanchshilAgro_Complete (1).sql` in MySQL Workbench or another MySQL client. **This script drops and recreates the database.**
+3. Copy `.env.example` to `.env` and set your MySQL connection values and a long, unique `SESSION_SECRET`.
 
-## Default Login Details
-| Role | Username | Password | Permissions |
-|------|----------|----------|-------------|
-| Admin (shop_owner) | `admin` | `Admin@123` | Full access - create/update/delete everything, access "DB Users & Privileges", can manage all modules |
-| Staff (counter) | `staff` | `Staff@123` | View products/stock, add customers, record payments, move stock to shelf. Cannot edit prices/restock/delete. |
-| Accountant | `accountant` | `Account@123` | Read-only access to Credit/Payment, outstanding view and dashboard |
+   ```powershell
+   Copy-Item .env.example .env
+   ```
 
-*Passwords are stored as bcrypt hashes in `app_user`. Never stored as plain text.*
+4. Install dependencies and start the app:
 
-## Features Implemented
-1. **Login & Authorization** - Session login/logout, role checks in UI and server (403), Admin page for DB users/privileges with SHOW GRANTS and GRANT/REVOKE demo.
-2. **Dashboard** - Summary cards, products per category, payments by mode, products per supplier, credit by status, outstanding per customer (HAVING), monthly payment chart (Chart.js).
-3. **Master Data CRUD** - Suppliers/Products/Customers with validation, search/sort, FK/duplicate/trigger error messages, Price History from `Price_Audit`.
-4. **Inventory** - Batch view with `v_stock_summary` badges (Red/Amber/Green), expiring batches via `v_expiring_batches`, add/delete batches (admin), move godown->shelf via `sp_move_to_shelf`.
-5. **Credit** - Create entries, list with balance, "Mark overdue accounts" update, delete blocked by trigger for unpaid.
-6. **Payments** - Record via `sp_record_payment`, filter/list, totals per customer, `v_customer_outstanding`.
-7. **Warranty** - Add/update status, list with joins, returns by status, admin-only delete.
-8. **Views & Routines** - Display all 5 views, call `sp_get_low_stock()`, `sp_add_customer`, `sp_customer_statement` (both result sets), test functions with discount capping demo, trigger demos.
-9. **SQL Query Viewer** - Each section shows the SQL executed (parameterized form) for learning purposes.
+   ```powershell
+   npm install
+   npm start
+   ```
 
-## Notes on Triggers/Behavior
-- `trg_payment_before_insert` blocks payment > credit balance (SQLSTATE 45000) - shown in UI.
-- `trg_payment_after_insert` updates `Credit.amount_paid` and `Credit.status` automatically. **The app does NOT update Credit after inserting a payment.**
-- `trg_product_after_update` writes to `Price_Audit` when `selling_price` changes.
-- `trg_inventory_before_insert` blocks already-expired batches.
-- `trg_credit_before_delete` blocks deleting unpaid credits.
+5. Open [http://localhost:3000](http://localhost:3000).
 
-## Security
-- **Parameterized queries everywhere** using `?` placeholders (mysql2). No string concatenation of user input into SQL.
-- Role checks enforced on server routes and hidden in UI.
-- Passwords hashed with bcrypt.
-- Sessions are httpOnly.
+Optional: run `npm run seed:users` to create or reset the demo login accounts. Demo credentials are defined in `db/seedAppUsers.js`; change them before using the app outside a local demonstration. The server creates demo users at startup only if `app_user` is empty.
 
-## Viva Q&A (10 Likely Questions & Answers)
-1. **Q:** Why do triggers update the credit instead of the app?  
-   **A:** To enforce business rules at the database level (data integrity). Even if someone inserts directly via SQL, the trigger ensures `amount_paid` and `status` stay correct.
+## Configuration
 
-2. **Q:** Difference between a View and a Table?  
-   **A:** A table stores data physically. A view is a virtual table defined by a query - it doesn't store data, it shows data from base tables (can simplify joins/security).
+| Variable | Purpose | Default |
+|---|---|---|
+| `DB_HOST` | MySQL host | `localhost` |
+| `DB_PORT` | MySQL port | `3306` |
+| `DB_USER` | MySQL username | `root` |
+| `DB_PASSWORD` | MySQL password | Empty |
+| `DB_NAME` | Database name | `PanchshilAgro` |
+| `SESSION_SECRET` | Session signing secret | Development fallback; set a unique secret |
+| `PORT` | HTTP port | `3000` |
 
-3. **Q:** Difference between a Stored Procedure and a Function?  
-   **A:** A procedure can return zero/many result sets and may use IN/OUT; called with `CALL`. A function must return a single value and is used in expressions/queries. Procedures are better for complex logic/actions, functions for calculations.
+## Roles
 
-4. **Q:** How do GRANT/REVOKE and roles work?  
-   **A:** `GRANT` gives privileges (SELECT/INSERT/EXECUTE etc.) on objects to users/roles. `REVOKE` removes them. Roles group privileges and can be granted to users (`GRANT role TO user`), making privilege management easier.
+The supported web roles are `admin`, `staff`, and `accountant`. The frontend hides controls that are not available to the current role, but authorization is also enforced on the API. Individual write operations have route-specific role requirements; review `routes/` and `middleware/auth.js` for the current rules.
 
-5. **Q:** What does WITH CHECK OPTION do in a view?  
-   **A:** It prevents inserts/updates through the view that would make rows disappear from the view. For `v_fertilizers` (WHERE category='Fertilizer'), inserting a non-Fertilizer would fail.
+## Security and deployment notes
 
-6. **Q:** Why use parameterized queries?  
-   **A:** They prevent SQL Injection by separating SQL code from data. The driver escapes values, so user input cannot change query structure.
+- Keep `.env`, passwords, and local notes out of Git. `.env.example` is a template and should contain placeholders only.
+- Change demo credentials and use a strong `SESSION_SECRET` before deployment.
+- The default Express session store is in-memory and is intended for local development/demonstrations. Use a persistent session store for production.
+- Serve production traffic over HTTPS and configure secure cookies, database least-privilege access, backups, and appropriate monitoring before deployment.
+- SQL uses `mysql2` parameter placeholders for user-supplied values. Do not build SQL statements from untrusted input.
 
-7. **Q:** What is the purpose of UNIQUE(product_id, batch_no) in Inventory?  
-   **A:** It prevents duplicate batches for the same product - each batch is identified uniquely per product.
+## Development
 
-8. **Q:** Why is credit_id NULL allowed in Payment?  
-   **A:** To record direct cash sales not tied to any credit/udhari entry. The trigger only updates Credit if `credit_id` is NOT NULL.
-
-9. **Q:** What does sp_customer_statement return?  
-   **A:** Two result sets - first shows all credit accounts for the customer (with balance), second shows all payments made by that customer.
-
-10. **Q:** Why is fn_discounted_price capped at 25%?  
-   **A:** Business rule in the function uses `LEAST(p_discount_pct, 25)`, so even if 30% is requested, only 25% discount is applied.
-
-## How to run (quick)
-```bash
-npm install
-# copy .env.example to .env and set DB creds
-npm run seed:users
-npm start
-# open http://localhost:3000
+```powershell
+npm run dev
 ```
 
-## Final Notes
-- All table/view/procedure/function/trigger names match the SQL files exactly.
-- No SQL built by string concatenation with user input - only `?` placeholders.
-- Role checks exist in UI and server routes.
-- App never updates `Credit` after payment - `trg_payment_after_insert` handles it.
-- If MySQL isn't available in this environment, DB-dependent features couldn't be tested live, but the code follows all requirements from the SQL files.
-
-# panchshil-agro-management
+The project currently does not define a test or lint script in `package.json`.
